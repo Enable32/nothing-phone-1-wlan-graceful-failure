@@ -1,125 +1,242 @@
-# Nothing Phone (1) WLAN graceful failure
+# Nothing Phone (1) WLAN Graceful Failure
 
-Experimental, exact-build Magisk module for Nothing Phone (1). It attempts to
-keep Android alive when WPSS/WLAN firmware recovery has already failed and a
-duplicate driver reinitialization would otherwise trigger the identified kernel
-BUG. Installer messages and Android notifications automatically follow the
-device language (Russian or English).
+Экспериментальный Magisk-модуль для Nothing Phone (1), который пытается не
+допустить полной перезагрузки Android после неудачного восстановления модуля
+Wi-Fi/WPSS.
 
 > [!WARNING]
-> This is not a hardware repair and is not a general Wi-Fi fix. It modifies a
-> kernel module in memory through Magisk. An incompatible build can cause a boot
-> failure. The installer refuses every unknown firmware and driver SHA-256.
+> Модуль создан под одну конкретную версию Nothing OS и две точные сборки
+> `qca_cld3_wlan.ko`. Это не ремонт аппаратной части телефона и не универсальный
+> модуль для других прошивок.
 
-## Supported device
+## Как всё началось
 
-- Nothing Phone (1), device codename `Spacewar`
-- Nothing OS build `2509261631`
-- Tested kernel: `5.4.274-qgki-g4670d6bdb795`
-- Stock driver SHA-256: `92542a7dccb8ead32046519fbdc03e024f258e5fe7cf13e51318c389df18f27f`
-- Patched driver SHA-256: `9127891857ca5d21ceacffa8a28c881235c7138496ab7ec85317b2af24057419`
+У моего Nothing Phone (1) появилась неприятная неисправность: телефон мог в
+любой момент полностью зависнуть, музыка останавливалась, затем на несколько
+секунд появлялся экран **Nothing CrashDump**, после чего устройство
+перезагружалось.
 
-## Installation
+Иногда телефон загружался сразу, но бывало и намного хуже: он мог часами снова
+попадать в CrashDump и не запускать Android. При этом после удара о твёрдую
+поверхность телефон иногда внезапно начинал загружаться. Это очень похоже на
+аппаратную проблему — например, плохой контакт, повреждение пайки или самого
+радиомодуля. Удары не являются способом ремонта и могут окончательно повредить
+плату или аккумулятор.
 
-1. Download the release ZIP. Do not extract it.
-2. Open Magisk → Modules → Install from storage.
-3. Select the ZIP and reboot after a successful installation.
-4. Verify after reboot:
+Так как быстро отремонтировать плату возможности не было, я решил попробовать
+хотя бы программно изменить поведение телефона: если Wi-Fi окончательно упал,
+пусть Android продолжит работать без него, покажет уведомление и сохранит логи.
+Перезагрузить телефон в удобный момент я смогу сам.
 
-   ```sh
-   su -c 'sha256sum /vendor/lib/modules/qca_cld3_wlan.ko'
-   ```
+## С чего началось исследование
 
-The installer does not contain or redistribute the proprietary WLAN driver. It
-copies the exact supported driver from the phone, applies a small binary patch,
-then verifies the complete output SHA-256 before installation.
+Компьютера рядом не было, поэтому все данные я собирал прямо на телефоне через
+Termux с root-доступом Magisk. Скрипт сохранял в том числе:
 
-Future releases can be detected through Magisk using the repository's
-`update.json` metadata.
+- `ro.boot.bootreason` и `sys.boot.reason`;
+- `pstore`/`ramoops` предыдущей загрузки;
+- `dmesg` и все буферы `logcat`;
+- сведения о DropBox, tombstones, ANR и vendor ramdump;
+- информацию о питании, температуре, памяти и процессах.
 
-## Behaviour
+Причина перезагрузки определялась как:
 
-- Successful automatic Wi-Fi recovery remains enabled.
-- After a final recovery failure, a dangerous duplicate callback is skipped.
-- The Android Wi-Fi switch is not turned off by this module.
-- Notifications report a WLAN failure or a previously captured WPSS panic.
-- Size-limited logs are copied to `/sdcard/log/wlan_graceful_fail`.
-- The Magisk module action button exports the current logs manually.
-
-## Emergency disable
-
-If Android does not boot, create this file from OrangeFox/TWRP and reboot:
-
-```sh
-touch /data/adb/modules/wlan_graceful_fail_spacewar/disable
+```text
+kernel_panic,bug
 ```
 
-The original vendor partition is never overwritten.
+В `console-ramoops` повторялись ошибки:
 
----
+```text
+MHI_DEV_SYS_ERR
+Driver reinit failed
+WLAN Panic
+```
 
-# Русский
+Финальный стек выглядел примерно так:
 
-Экспериментальный Magisk-модуль только для точной сборки Nothing Phone (1).
-Он пытается оставить Android работающим, когда восстановление прошивки WPSS/WLAN
-уже завершилось ошибкой, а повторная инициализация драйвера могла вызвать
-выявленный kernel BUG. Язык установщика и уведомлений выбирается автоматически:
-русский или английский.
+```text
+__dsc_psoc_assert_trans_protected
+osif_psoc_sync_trans_resume
+wlan_hdd_pld_reinit
+pld_ipci_reinit
+icnss_pd_restart_complete
+```
 
-> [!WARNING]
-> Это не ремонт аппаратной части и не универсальное исправление Wi-Fi. Модуль
-> изменяет драйвер ядра через подмену Magisk. Несовместимая версия может нарушить
-> загрузку. Установщик отклоняет неизвестную прошивку или SHA-256 драйвера.
+После падения WPSS драйвер пытался восстановить Wi-Fi. Когда восстановление уже
+закончилось ошибкой, в очередь попадал ещё один callback. Он снова заходил в
+`osif_psoc_sync_trans_resume()`, хотя активной транзакции уже не было. Проверка
+внутри драйвера вызывала `BUG`, а затем падало всё ядро Android.
 
-## Поддерживаемое устройство
+## Первый найденный драйвер
 
-- Nothing Phone (1), кодовое имя `Spacewar`
-- Сборка Nothing OS `2509261631`
-- Проверенное ядро: `5.4.274-qgki-g4670d6bdb795`
-- SHA-256 штатного драйвера: `92542a7dccb8ead32046519fbdc03e024f258e5fe7cf13e51318c389df18f27f`
-- SHA-256 изменённого драйвера: `9127891857ca5d21ceacffa8a28c881235c7138496ab7ec85317b2af24057419`
+Сначала я нашёл используемый WLAN-драйвер здесь:
+
+```text
+/vendor/lib/modules/qca_cld3_wlan.ko
+```
+
+Так появилась первая экспериментальная модификация драйвера. Изменение не
+пыталось насильно выгружать и загружать Wi-Fi заново — для частично неисправного
+железа это могло вызвать ещё больше проблем.
+
+В версии v0.2 неудачная реинициализация возвращалась подсистеме ICNSS как уже
+обработанная. После этого телефон действительно стал чаще загружаться с первого
+раза, но случайные перезагрузки полностью не исчезли.
+
+В v0.3 перед повторной реинициализацией появилась дополнительная проверка
+`CDS_DRIVER_STATE_BAD`. По идее она должна была остановить повторный callback,
+но в реальных crash-логах состояние драйвера было `0x232c8b` или `0x222c8b` и
+не всегда содержало ожидаемый бит. Значит, такая проверка была недостаточно
+надёжной.
+
+## Почему v0.3 всё равно могла перезагружать телефон
+
+После очередного падения я проверил хеш активного файла: Magisk действительно
+подменял найденный драйвер версией v0.3. Но в новом логе ICNSS всё равно получала
+от callback значение `-1`, хотя пропатченная функция должна была возвращать
+успех.
+
+Это означало, что ядро могло использовать другой экземпляр драйвера.
+
+Дальнейшая проверка обнаружила вторую копию:
+
+```text
+/vendor/lib/modules/5.4-gki/qca_cld3_wlan.ko
+```
+
+В `init.target.rc` нашлись две фоновые команды:
+
+```text
+/vendor/bin/modprobe -a -d /vendor/lib/modules/ qca_cld3_wlan qca_cld3_qca6390
+/vendor/bin/modprobe -a -d /vendor/lib/modules/5.4-gki qca_cld3_wlan qca_cld3_qca6390
+```
+
+Обе команды запускались параллельно. Получалась гонка: иногда первой
+загружалась модифицированная верхняя копия, а иногда — штатная копия из
+`5.4-gki`. v0.3 заменяла только первый файл, поэтому результат мог отличаться
+от одной загрузки телефона к другой.
+
+## Что изменено в v0.4
+
+v0.4 содержит две отдельно проверенные модификации:
+
+```text
+/vendor/lib/modules/qca_cld3_wlan.ko
+/vendor/lib/modules/5.4-gki/qca_cld3_wlan.ko
+```
+
+Это разные бинарные файлы с разными смещениями функций и ELF-релокаций, поэтому
+каждый из них изменялся и проверялся отдельно.
+
+Новая защита использует уже существующий внутри драйвера счётчик неудачных
+реинициализаций по адресу `.bss + 0x128`:
+
+1. Первое штатное восстановление WPSS/Wi-Fi по-прежнему разрешено.
+2. Если `hdd_wlan_re_init()` завершилась успешно, счётчик остаётся нулевым или
+   сбрасывается, и драйвер продолжает работать штатно.
+3. Если восстановление завершилось ошибкой, драйвер сам увеличивает счётчик.
+4. Повторный callback видит ненулевой счётчик и больше не входит в
+   `osif_psoc_sync_trans_resume()` для уже завершённой транзакции.
+5. Ошибка сообщается ICNSS как обработанная, чтобы не провоцировать немедленную
+   панику ядра.
+
+При окончательном отказе Wi-Fi может остаться недоступным до ручной
+перезагрузки, но сам переключатель Wi-Fi в настройках Android модуль не
+выключает.
+
+Также модуль:
+
+- показывает уведомление о неудачном восстановлении Wi-Fi;
+- автоматически выбирает русский или английский текст;
+- сохраняет `pstore`, ограниченный по размеру журнал ядра и события WLAN;
+- добавляет в Magisk кнопку **Action/Действие** для сохранения текущего статуса;
+- проверяет модель, номер сборки и SHA-256 обоих драйверов перед установкой.
+
+Логи сохраняются в:
+
+```text
+/sdcard/log/wlan_graceful_fail
+```
+
+## Совместимость
+
+Модуль предназначен только для следующей конфигурации:
+
+| Параметр | Значение |
+| --- | --- |
+| Устройство | Nothing Phone (1) |
+| Кодовое имя | Spacewar |
+| Сборка Android | `2509261631` |
+| Ядро | `5.4.274-qgki-g4670d6bdb795` |
+| Root | Magisk |
+
+Установщик откажется продолжать работу, если сборка или хеши драйверов не
+совпадают. После обновления Nothing OS совместимость нужно исследовать заново.
 
 ## Установка
 
-1. Скачайте ZIP из раздела Releases, не распаковывая его.
-2. Откройте Magisk → Модули → Установить из хранилища.
-3. Выберите ZIP и после успешной установки перезагрузите телефон.
-4. После запуска проверьте:
+### Через Magisk Manager
 
-   ```sh
-   su -c 'sha256sum /vendor/lib/modules/qca_cld3_wlan.ko'
-   ```
+1. Открыть **Magisk → Модули**.
+2. Нажать **Установить из хранилища**.
+3. Выбрать `wlanfix_v04.zip`.
+4. Дождаться сообщения об успешной установке.
+5. Перезагрузить телефон.
 
-В ZIP нет фирменного WLAN-драйвера. Установщик копирует с телефона точную
-поддерживаемую версию, применяет небольшие байтовые изменения и перед установкой
-проверяет полный SHA-256 результата.
+### Через Termux
 
-Новые версии могут определяться самим Magisk через файл `update.json` этого
-репозитория.
+```sh
+su -c 'magisk --install-module /sdcard/Download/wlanfix_v04.zip'
+```
 
-## Поведение
+После успешной установки также требуется перезагрузка.
 
-- Успешное автоматическое восстановление Wi-Fi остаётся включённым.
-- После окончательной ошибки опасный повторный callback пропускается.
-- Модуль не выключает системный переключатель Wi-Fi.
-- Уведомления сообщают об отказе WLAN или сохранённой панике WPSS.
-- Ограниченные по размеру журналы копируются в `/sdcard/log/wlan_graceful_fail`.
-- Кнопка действия модуля в Magisk вручную экспортирует текущие журналы.
+## Проверка после загрузки
 
-## Аварийное отключение
+```sh
+su -c '
+sha256sum /vendor/lib/modules/qca_cld3_wlan.ko
+sha256sum /vendor/lib/modules/5.4-gki/qca_cld3_wlan.ko
+'
+```
 
-Если Android не загружается, создайте из OrangeFox/TWRP файл и перезагрузитесь:
+Для v0.4 ожидаются следующие значения:
+
+```text
+7babd9e6b6e5627e521871609409e08d55ba50d0255cc7ae77c712c0a6314718
+f95560690ea959d3fd87501f878e6a798b20c798b710492bea8ba0a231e3cf0c
+```
+
+## Если телефон перестал загружаться
+
+Через терминал OrangeFox можно отключить модуль:
 
 ```sh
 touch /data/adb/modules/wlan_graceful_fail_spacewar/disable
 ```
 
-Оригинальный раздел vendor не перезаписывается.
+После этого нужно перезагрузить телефон. Оригинальные разделы `vendor` модуль
+не изменяет: Magisk подменяет файлы только во время загрузки.
 
-## License / Лицензия
+## Ограничения
 
-The scripts and documentation in this repository are licensed under the MIT
-License. No proprietary Nothing/Qualcomm driver binary is included.
+Этот проект обходит только один конкретный сценарий паники ядра после
+неудачного восстановления WLAN. Он не может гарантированно предотвратить:
 
-Скрипты и документация распространяются по лицензии MIT. Фирменный бинарный
-драйвер Nothing/Qualcomm в репозиторий не включён.
+- физическое отключение или зависание Wi-Fi/WPSS;
+- потерю питания или зависание всего SoC;
+- другую ошибку ядра;
+- CrashDump, произошедший до загрузки Android и Magisk;
+- окончательное разрушение контакта или элемента на системной плате.
+
+Моя основная цель — не сделать неисправный Wi-Fi исправным, а дать Android шанс
+продолжить работу после его отказа и позволить сохранить данные перед ручной
+перезагрузкой.
+
+## Статус проекта
+
+v0.4 является экспериментальной версией. Перед публичным распространением её
+нужно проверить на реальном устройстве: убедиться, что обе копии драйвера
+подменяются, телефон нормально загружается и следующий сбой WPSS больше не
+приводит к тому же `__dsc_psoc_assert_trans_protected` kernel BUG.
