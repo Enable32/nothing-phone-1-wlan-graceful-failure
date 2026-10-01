@@ -1,7 +1,7 @@
 id=wlan_graceful_fail_spacewar
 name=Nothing Phone (1) WLAN graceful failure / мягкий отказ Wi-Fi
-version=0.4 bilingual installer (Spacewar 2509261631)
-versionCode=4
-author=Enable32
-description=EN: Experimental exact-build WLAN recovery guard with notifications and logs. RU: Экспериментальная защита восстановления Wi-Fi с уведомлениями и журналами для точной сборки.
+version=0.9 boot-image builder (Spacewar 2509261631)
+versionCode=9
+author=Enable32 / OpenAI Codex analysis
+description=EN: Exact-build dual WLAN guards, WPSS RELATED fallback, logs, and a safe boot-image builder. RU: Две защиты WLAN, WPSS RELATED, журналы и безопасная сборка boot-образа для точной прошивки.
 updateJson=https://raw.githubusercontent.com/Enable32/nothing-phone-1-wlan-graceful-failure/main/update.json

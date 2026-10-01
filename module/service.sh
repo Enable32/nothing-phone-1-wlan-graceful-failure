@@ -6,14 +6,26 @@ LOGROOT="/data/adb/wlan_graceful_fail_logs"
 EVENT_LOG="$LOGROOT/events.log"
 PUBLIC_LOGROOT="/sdcard/log/wlan_graceful_fail"
 
-detect_language() {
-    DEVICE_LOCALE="$(getprop persist.sys.locale)"
-    [ -n "$DEVICE_LOCALE" ] || DEVICE_LOCALE="$(getprop ro.product.locale)"
-    case "$DEVICE_LOCALE" in
-        ru*|RU*|*_RU*|*-RU*) UI_LANG=ru ;;
-        *) UI_LANG=en ;;
-    esac
-}
+LOCALE="$(getprop persist.sys.locale)"
+[ -n "$LOCALE" ] || LOCALE="$(getprop ro.product.locale)"
+case "$LOCALE" in
+    ru*|RU*)
+        FAILURE_TITLE="Ошибка Wi-Fi"
+        FAILURE_TEXT="WPSS/WLAN дал сбой. Аварийная перезагрузка драйвером заблокирована; Wi-Fi может быть недоступен до ручной перезагрузки."
+        PANIC_TITLE="Сохранён журнал перезагрузки"
+        PANIC_TEXT="Предыдущая перезагрузка связана с WPSS/Wi-Fi. Для дампа: Action, Громкость -, затем Громкость +."
+        ;;
+    *)
+        FAILURE_TITLE="Wi-Fi failure"
+        FAILURE_TEXT="WPSS/WLAN failed. The driver's forced kernel crash was blocked; Wi-Fi may stay unavailable until a manual reboot."
+        PANIC_TITLE="Reboot log saved"
+        PANIC_TEXT="The previous reboot was related to WPSS/Wi-Fi. For a dump: Action, Volume Down, then Volume Up."
+        ;;
+esac
+
+rm -f "$STATE_FILE"
+mkdir -p "$LOGROOT"
+chmod 0700 "$LOGROOT"
 
 rotate_event_log() {
     SIZE="$(wc -c < "$EVENT_LOG" 2>/dev/null)"
@@ -23,6 +35,19 @@ rotate_event_log() {
     if [ "$SIZE" -gt 262144 ]; then
         mv -f "$EVENT_LOG" "$EVENT_LOG.1"
     fi
+}
+
+record_boot_status() {
+    rotate_event_log
+    {
+        echo "=== MODULE BOOT $(date) ==="
+        echo "build=$(getprop ro.build.version.incremental)"
+        echo "bootreason=$(getprop ro.boot.bootreason)"
+        sha256sum /vendor/lib/modules/qca_cld3_wlan.ko 2>&1
+        sha256sum /vendor/lib/modules/5.4-gki/qca_cld3_wlan.ko 2>&1
+        grep '^wlan ' /proc/modules 2>&1
+        grep 'qca_cld3_wlan.ko' /proc/mounts 2>&1
+    } >> "$EVENT_LOG"
 }
 
 save_pstore() {
@@ -35,13 +60,29 @@ save_pstore() {
         if [ ! -f "$DEST" ]; then
             cp -f "$SRC" "$DEST" 2>/dev/null
             chmod 0600 "$DEST" 2>/dev/null
-            if grep -aEq 'WLAN Panic|MHI_DEV_SYS_ERR|Driver reinit failed' "$DEST"; then
+            if grep -aEq 'WLAN Panic|MHI_DEV_SYS_ERR|Driver reinit failed|consecutive probe failures|QDF BUG in __hdd_soc_probe' "$DEST"; then
                 NEW_WLAN_PANIC=1
             fi
         fi
     done
 
+    for SRC in /sys/fs/pstore/pmsg-ramoops-*; do
+        [ -f "$SRC" ] || continue
+        HASH="$(sha256sum "$SRC" 2>/dev/null | awk '{print $1}')"
+        [ -n "$HASH" ] || continue
+        DEST="$LOGROOT/pmsg-ramoops-$HASH.txt"
+        if [ ! -f "$DEST" ]; then
+            cp -f "$SRC" "$DEST" 2>/dev/null
+            chmod 0600 "$DEST" 2>/dev/null
+        fi
+    done
+
     ls -1t "$LOGROOT"/console-ramoops-*.txt 2>/dev/null |
+    tail -n +6 |
+    while IFS= read -r OLD; do
+        rm -f "$OLD"
+    done
+    ls -1t "$LOGROOT"/pmsg-ramoops-*.txt 2>/dev/null |
     tail -n +6 |
     while IFS= read -r OLD; do
         rm -f "$OLD"
@@ -57,50 +98,40 @@ wait_for_android() {
 publish_logs() {
     wait_for_android
     mkdir -p "$PUBLIC_LOGROOT" 2>/dev/null || return
-    cp -f "$LOGROOT"/console-ramoops-*.txt "$PUBLIC_LOGROOT"/ 2>/dev/null
-    cp -f "$LOGROOT"/events.log* "$PUBLIC_LOGROOT"/ 2>/dev/null
-    cp -f "$LOGROOT"/kernel.log* "$PUBLIC_LOGROOT"/ 2>/dev/null
-    ls -1t "$PUBLIC_LOGROOT"/console-ramoops-*.txt 2>/dev/null |
-    tail -n +6 |
+    rm -f "$PUBLIC_LOGROOT"/kernel.log* 2>/dev/null
+    rm -f "$PUBLIC_LOGROOT"/events.log* 2>/dev/null
+    rm -f "$PUBLIC_LOGROOT"/console-ramoops-*.txt 2>/dev/null
+    rm -f "$PUBLIC_LOGROOT"/pmsg-ramoops-*.txt 2>/dev/null
+    rm -f "$PUBLIC_LOGROOT"/status_*.txt 2>/dev/null
+    ls -1t "$PUBLIC_LOGROOT"/wlan_dump_*.tar.gz 2>/dev/null |
+    tail -n +2 |
     while IFS= read -r OLD; do
         rm -f "$OLD"
     done
     chmod 0755 "$PUBLIC_LOGROOT" 2>/dev/null
-    chmod 0644 "$PUBLIC_LOGROOT"/* 2>/dev/null
 }
 
 notify_failure() {
     wait_for_android
     publish_logs
-    detect_language
-    if [ "$UI_LANG" = "ru" ]; then
-        TITLE="Ошибка Wi-Fi"
-        BODY="Модуль Wi-Fi не восстановился. Телефон продолжит работать; перезагрузите его, когда будет удобно."
-    else
-        TITLE="Wi-Fi failure"
-        BODY="The Wi-Fi subsystem did not recover. The phone will keep running; reboot it when convenient."
-    fi
-    cmd notification post -t "$TITLE" wlan_recovery_failed "$BODY" >/dev/null 2>&1
+    cmd notification post \
+        -t "$FAILURE_TITLE" \
+        wlan_recovery_failed \
+        "$FAILURE_TEXT" \
+        >/dev/null 2>&1
 }
 
 notify_previous_panic() {
     wait_for_android
     publish_logs
-    detect_language
-    if [ "$UI_LANG" = "ru" ]; then
-        TITLE="Сохранён журнал перезагрузки"
-        BODY="Предыдущая перезагрузка связана с WPSS/Wi-Fi. Журнал: Внутренняя память/log/wlan_graceful_fail"
-    else
-        TITLE="Reboot log saved"
-        BODY="The previous reboot was related to WPSS/Wi-Fi. Log: Internal storage/log/wlan_graceful_fail"
-    fi
-    cmd notification post -t "$TITLE" wlan_previous_panic "$BODY" >/dev/null 2>&1
+    cmd notification post \
+        -t "$PANIC_TITLE" \
+        wlan_previous_panic \
+        "$PANIC_TEXT" \
+        >/dev/null 2>&1
 }
 
-rm -f "$STATE_FILE"
-mkdir -p "$LOGROOT"
-chmod 0700 "$LOGROOT"
-
+record_boot_status
 save_pstore
 publish_logs &
 if [ "$NEW_WLAN_PANIC" = "1" ]; then
@@ -121,8 +152,12 @@ while true; do
                     date
                     echo "$LINE"
                 } >> "$EVENT_LOG"
+                if [ ! -e "$STATE_FILE" ]; then
+                    : > "$STATE_FILE"
+                    notify_failure &
+                fi
                 ;;
-            *"consecutive reinit failures:"*|*"Driver reinit failed:"*)
+            *"consecutive reinit failures:"*|*"consecutive probe failures:"*|*"Driver reinit failed:"*)
                 rotate_event_log
                 {
                     date
@@ -137,4 +172,3 @@ while true; do
     done
     sleep 2
 done
-
