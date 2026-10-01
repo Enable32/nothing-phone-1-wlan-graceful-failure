@@ -4,17 +4,25 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 MODULE="$ROOT/module"
 DIST="$ROOT/dist"
-OUTPUT="$DIST/Nothing-Phone-1-WLAN-Graceful-Failure-v0.4.zip"
+OUTPUT="$DIST/Nothing-Phone-1-WLAN-Graceful-Failure-v0.9.zip"
 
 mkdir -p "$DIST"
-rm -f "$OUTPUT"
+[ ! -e "$OUTPUT" ] || unlink "$OUTPUT"
 
 (
     cd "$MODULE"
     zip -0 -X "$OUTPUT" \
-        module.prop customize.sh service.sh action.sh PATCHED_SHA256.txt README.md
+        module.prop \
+        customize.sh \
+        post-fs-data.sh \
+        service.sh \
+        action.sh \
+        boot_patch.sh \
+        boot_patch/payload/wpss_related_rescue.rc \
+        boot_patch/payload/wpss_related_rescue.sh \
+        PATCHED_SHA256.txt \
+        README.md
 )
 
 unzip -t "$OUTPUT"
 sha256sum "$OUTPUT"
-
