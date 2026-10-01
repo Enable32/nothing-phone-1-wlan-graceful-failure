@@ -1,6 +1,6 @@
 {
-  "version": "0.4 bilingual installer (Spacewar 2509261631)",
-  "versionCode": 4,
-  "zipUrl": "https://github.com/Enable32/nothing-phone-1-wlan-graceful-failure/releases/download/v0.4/Nothing-Phone-1-WLAN-Graceful-Failure-v0.4.zip",
+  "version": "0.9 boot-image builder (Spacewar 2509261631)",
+  "versionCode": 9,
+  "zipUrl": "https://github.com/Enable32/nothing-phone-1-wlan-graceful-failure/releases/download/v0.9/Nothing-Phone-1-WLAN-Graceful-Failure-v0.9.zip",
   "changelog": "https://raw.githubusercontent.com/Enable32/nothing-phone-1-wlan-graceful-failure/main/CHANGELOG.md"
 }
