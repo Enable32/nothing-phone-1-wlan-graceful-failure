@@ -1,0 +1,16 @@
+# Nothing Phone (1) Spacewar WPSS boot rescue.
+# Injected into a copied Magisk-patched boot image through overlay.d.
+
+service wpss-related-guard ${MAGISKTMP}/wpss_related_rescue.sh guard early-init
+    class core
+    user root
+    group root
+    seclabel u:r:magisk:s0
+    disabled
+    oneshot
+
+on early-init
+    start wpss-related-guard
+
+on post-fs-data
+    exec u:r:magisk:s0 root root -- ${MAGISKTMP}/wpss_related_rescue.sh once post-fs-data
