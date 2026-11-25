@@ -2,7 +2,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-ZIP="$ROOT/dist/Nothing-Phone-1-WLAN-Graceful-Failure-v0.9.zip"
+ZIP="${1:-$ROOT/dist/Nothing-Phone-1-WLAN-v1.3-RECOVERY-TEST.zip}"
 
 for SCRIPT in \
     "$ROOT"/module/customize.sh \
@@ -15,7 +15,7 @@ for SCRIPT in \
 done
 
 [ -f "$ZIP" ] || {
-    echo "Build the ZIP first with tools/build.sh" >&2
+    echo "Archive missing: $ZIP" >&2
     exit 1
 }
 
@@ -31,14 +31,24 @@ for REQUIRED in \
     boot_patch/payload/wpss_related_rescue.rc \
     boot_patch/payload/wpss_related_rescue.sh \
     PATCHED_SHA256.txt \
-    README.md; do
+    README.md \
+    driver_patch.json \
+    source/driver_patch.json \
+    source/patch_driver.py \
+    source/build_driver.py \
+    source/test_driver.py \
+    source/test_results.json \
+    source/packaging_results.json; do
     unzip -Z1 "$ZIP" | grep -Fx "$REQUIRED" >/dev/null
 done
 
-if unzip -Z1 "$ZIP" | grep -Eq '^system/vendor/.+\.ko$'; then
-    echo "Unexpected proprietary kernel module in ZIP" >&2
+if unzip -Z1 "$ZIP" | grep -Eq '\.(ko|img)$'; then
+    echo "Unexpected proprietary kernel module or boot image in ZIP" >&2
     exit 1
 fi
 
+if [ "$#" -eq 0 ]; then
+    (cd "$ROOT/dist" && sha256sum -c SHA256SUMS)
+fi
 sha256sum "$ZIP"
-echo "Verification passed"
+echo "Archive verification passed; no device or hardware test was run."

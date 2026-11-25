@@ -1,3 +1,4 @@
 27a2bc077b38299f495377b1b13ed9143bfc53e48904d89af080834a1801d47c  /vendor/lib/modules/qca_cld3_wlan.ko
 8d76c32c557648c7633b8d6090dcc8a0afb4d6dcb15b027338e244d1f7156166  /vendor/lib/modules/5.4-gki/qca_cld3_wlan.ko
-6285978fe6650510da801b24067bf95ef067c01b6c2c5b5d61b0c7d5425d28c8  supported boot_a input for Action boot-image builder
+291cce1505c234e8425abf3eea385fe077ae8663ba1c1337c414b6d0be6b93e9  /vendor/lib/modules/qca_cld3_qca6750.ko
+e2388611edd9fe47  expected loaded QCA6750 GNU build ID (v1.3 TEST)

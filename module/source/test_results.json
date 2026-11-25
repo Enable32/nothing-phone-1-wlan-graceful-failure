@@ -1,0 +1,25 @@
+{
+  "passed": 20,
+  "cases": [
+    "real recovery succeeds",
+    "unloading skips recovery",
+    "late duplicate skips recovery",
+    "busy recovery owns nothing",
+    "real recovery error preserved",
+    "third recovery failure returns error",
+    "missing QDF context cleans up",
+    "SMMU failure cleans up",
+    "new FW crash retains recovering state",
+    "normal shutdown releases ownership",
+    "unloading skips shutdown",
+    "late shutdown skips safely",
+    "busy shutdown releases nothing",
+    "shutdown state race releases own transaction",
+    "missing HDD context releases shutdown",
+    "missing HIF context releases shutdown",
+    "invalid bus 8 rejected",
+    "invalid bus 9 rejected",
+    "invalid bus 4294967295 rejected",
+    "shutdown, recovery, duplicate recovery, late shutdown lifecycle"
+  ]
+}

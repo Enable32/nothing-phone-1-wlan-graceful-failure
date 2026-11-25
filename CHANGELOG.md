@@ -1,5 +1,52 @@
 # Changelog / История изменений
 
+## 1.3 TEST — опубликовано 2026-11-25, исходный архив 2026-10-21
+
+- Опубликованы исходный ZIP v1.3 и совпадающие с ним исходники без изменения
+  скриптов установленной сборки.
+- Для QCA6750 возвращён настоящий WLAN reinit с отдельным захватом
+  psoc-транзакции в shutdown/reinit. Обработчик освобождает только свою
+  транзакцию; повторный callback и занятая транзакция обрабатываются отдельно.
+- Реальные ошибки возвращаются через очистку. Локальные recovery-failure
+  panic/BUG обходятся; глобальные watchdog, защита стека и Bluetooth-драйверы
+  сохраняются.
+- Ранний boot-builder монтирует QCA6750 до vendor_modprobe и сохраняет WPSS
+  RELATED. Kernel и существующий Magisk ramdisk проверяются и сохраняются.
+  Повторная установка Magisk сборщику не нужна; автоматической прошивки нет.
+- На устройстве подтверждён один успешный цикл WPSS restart → WLAN reinit →
+  подключение к сети в той же загрузке Android (дамп от 2026-11-15).
+- Отдельный native FORTIFY crash system_server перед полным перезапуском
+  исследуется отдельно. Причастность Pixel-spoofing модуля не подтверждена.
+- Все публичные диагностические файлы сохраняются в /sdcard/log.
+- Основной update.json оставлен на v0.9; TEST доступен по отдельной ссылке
+  и описан в update-test.json.
+- Исходные отчёты о 20 проверках обработчиков и 17 проверках упаковки включены
+  как исторические отчёты, а не как новый аппаратный тест.
+- Повторная проверка публикации: ZIP/CRC, точное совпадение файлов с архивом,
+  синтаксис shell/Python, JSON, границы патчей и идентичность QCA6750.
+- ZIP SHA-256:
+  `7906ff6c098e2edb50ac29b1e83c82aeacf09088cabf36305fa616a125efcabc`.
+
+English: publish the unchanged v1.3 owned-recovery TEST archive and its sources,
+document one confirmed on-device WLAN recovery, preserve existing Magisk and
+kernel in the boot builder, and separate the unresolved system_server property
+read crash from the WLAN recovery evidence. This remains experimental; hardware
+faults and other reboot causes are not fixed by this release.
+
+## 1.2 TEST — история исследования
+
+- Добавлен отдельный ранний QCA6750 и RELATED guard.
+- Reinit намеренно возвращал -EIO; WPSS мог восстановиться, но WLAN оставался
+  в состоянии recovering без полноценного запуска адаптеров.
+- Added early QCA6750 mounting; intentionally blocked real reinit. Superseded
+  by the v1.3 recovery experiment.
+
+## 1.0–1.1 TEST — история исследования
+
+- Исследована ранняя загрузка до vendor_modprobe и фактическая идентичность
+  QCA6750; расширена проверка уже рутованных boot-образов.
+- Investigated early driver loading and the active QCA6750 variant.
+
 ## 0.9
 
 - Added a two-page bilingual volume-key Action menu.

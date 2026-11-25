@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "device": "Spacewar",
+  "build": "2509261631",
+  "kernel": "5.4.274-qgki-g4670d6bdb795",
+  "size": 14749616,
+  "accepted_sha256": [
+    "d205f2480c621b0eef866b61c684f9c9669136e932d4a0ee3914fccaf0c60139",
+    "aaa967a88106757dc7aa9958a8206f520a6e040bf57299b7964e12ae06bb53c0"
+  ],
+  "output_sha256": "291cce1505c234e8425abf3eea385fe077ae8663ba1c1337c414b6d0be6b93e9",
+  "loaded_build_id": "e2388611edd9fe47",
+  "patches": [
+    {
+      "offset": 2015696,
+      "data": "ggM="
+    },
+    {
+      "offset": 2016404,
+      "data": "4AEANwAAAJSgARg2BgAAFB8gA9UfIAPVHyAD1Q=="
+    },
+    {
+      "offset": 2016464,
+      "data": "6ANA+cgAALQABUD5HyAD1R8gA9UfIAPV"
+    },
+    {
+      "offset": 2016548,
+      "data": "YP0f"
+    },
+    {
+      "offset": 2016764,
+      "data": "IgM="
+    },
+    {
+      "offset": 2016780,
+      "data": "/wMA+QAAAJSgAgA2AgAAkAMAAJBCAACRYwAAkWAGgFKBAIBSAAAAlPQDHypmAAAUAAAAlKD/HzYCAACQQgAAkeEDAJHgAxOqAAAAlKAAADR5AAAUtAKAElsAABT1//8X4ANA+QAAAJQBAAAU"
+    },
+    {
+      "offset": 2017152,
+      "data": "AQAAFA=="
+    },
+    {
+      "offset": 2017188,
+      "data": "BAAAFB8gA9UfIAPVHyAD1Q=="
+    },
+    {
+      "offset": 2017224,
+      "data": "FA=="
+    },
+    {
+      "offset": 2017348,
+      "data": "4///Fx8gA9UfIAPVHyAD1R8gA9UfIAPVHyAD1R8gA9UfIAPVHyAD1R8gA9UfIAPVHyAD1R8gA9UfIAPVHyAD1Q=="
+    },
+    {
+      "offset": 2279244,
+      "data": "gAQAtAcAABQ="
+    },
+    {
+      "offset": 2279348,
+      "data": "AQAAFA=="
+    },
+    {
+      "offset": 6330576,
+      "data": "4jiGEe3Z/kc="
+    },
+    {
+      "offset": 8870096,
+      "data": "GwEAAPR4AAAAAAAAAAAAAFSWAwAAAAAAGwEAAD+BAAAAAAA="
+    },
+    {
+      "offset": 8870144,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8870168,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8870268,
+      "data": "P4E="
+    },
+    {
+      "offset": 8870288,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8870312,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8870336,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8870360,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8870388,
+      "data": "UoY="
+    },
+    {
+      "offset": 8871156,
+      "data": "IAcAAMT7Bw=="
+    },
+    {
+      "offset": 8871180,
+      "data": "IAcAAKYMDw=="
+    },
+    {
+      "offset": 8871200,
+      "data": "FQEAACAHAADE+wc="
+    },
+    {
+      "offset": 8871228,
+      "data": "IAcAAKYMDw=="
+    },
+    {
+      "offset": 8871252,
+      "data": "bg=="
+    },
+    {
+      "offset": 8871272,
+      "data": "GwEAAPR4AAAAAAA="
+    },
+    {
+      "offset": 8871296,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8871320,
+      "data": "EwEAACAHAACmDA8="
+    },
+    {
+      "offset": 8871352,
+      "data": "pgwP"
+    },
+    {
+      "offset": 8871368,
+      "data": "AAAAAAAA"
+    },
+    {
+      "offset": 8871396,
+      "data": "/3w="
+    },
+    {
+      "offset": 8872424,
+      "data": "AAAAAAAA"
+    },
+    {
+      "offset": 8872448,
+      "data": "AAAAAAAA"
+    },
+    {
+      "offset": 8872472,
+      "data": "AAAAAAAA"
+    },
+    {
+      "offset": 8872496,
+      "data": "AAAAAAAA"
+    },
+    {
+      "offset": 8872904,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8872928,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8872952,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8872976,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8873000,
+      "data": "AAAAAAAA"
+    },
+    {
+      "offset": 8873024,
+      "data": "AAAAAAAA"
+    },
+    {
+      "offset": 8873048,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8873072,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8873096,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8873120,
+      "data": "AAAAAAAAAAAAAAA="
+    },
+    {
+      "offset": 8873144,
+      "data": "AAAAAAAA"
+    },
+    {
+      "offset": 8873168,
+      "data": "AAAAAAAA"
+    },
+    {
+      "offset": 9279488,
+      "data": "AAAAAAAAAAAAAAA="
+    }
+  ]
+}

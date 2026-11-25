@@ -1,0 +1,23 @@
+{
+  "passed": 17,
+  "cases": [
+    "shell syntax: customize.sh",
+    "shell syntax: action.sh",
+    "shell syntax: post-fs-data.sh",
+    "shell syntax: boot_patch.sh",
+    "shell syntax: service.sh",
+    "shell syntax: boot_patch/payload/wpss_related_rescue.sh",
+    "native shell patch: stock",
+    "native shell patch: v12",
+    "native shell patch: v13",
+    "native shell rejects unknown input hash without mutation",
+    "builder existing-image guard: existing v12",
+    "builder existing-image guard: existing v13",
+    "builder existing-image guard: mixed early payload",
+    "builder existing-image guard: unknown early driver",
+    "builder existing-image guard: missing early driver",
+    "Python patcher refuses unsupported input without output",
+    "builder and early payload use the same expected driver identity"
+  ],
+  "scope": "shell patch, payload acceptance, syntax and identity checks; no native magiskboot/device boot test"
+}

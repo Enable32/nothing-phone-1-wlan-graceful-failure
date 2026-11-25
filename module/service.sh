@@ -4,22 +4,22 @@ MODDIR=${0%/*}
 STATE_FILE="$MODDIR/.notified_this_boot"
 LOGROOT="/data/adb/wlan_graceful_fail_logs"
 EVENT_LOG="$LOGROOT/events.log"
-PUBLIC_LOGROOT="/sdcard/log/wlan_graceful_fail"
+PUBLIC_LOGROOT="/sdcard/log"
 
 LOCALE="$(getprop persist.sys.locale)"
 [ -n "$LOCALE" ] || LOCALE="$(getprop ro.product.locale)"
 case "$LOCALE" in
     ru*|RU*)
         FAILURE_TITLE="Ошибка Wi-Fi"
-        FAILURE_TEXT="WPSS/WLAN дал сбой. Аварийная перезагрузка драйвером заблокирована; Wi-Fi может быть недоступен до ручной перезагрузки."
+        FAILURE_TEXT="WPSS/WLAN дал сбой. Тест v1.3 пытается восстановить Wi-Fi; результат нужно проверить. Для дампа: Action, Громкость -, затем Громкость +."
         PANIC_TITLE="Сохранён журнал перезагрузки"
-        PANIC_TEXT="Предыдущая перезагрузка связана с WPSS/Wi-Fi. Для дампа: Action, Громкость -, затем Громкость +."
+        PANIC_TEXT="В журнале прошлой загрузки есть ошибки WPSS/Wi-Fi. Для дампа: Action, Громкость -, затем Громкость +."
         ;;
     *)
         FAILURE_TITLE="Wi-Fi failure"
-        FAILURE_TEXT="WPSS/WLAN failed. The driver's forced kernel crash was blocked; Wi-Fi may stay unavailable until a manual reboot."
+        FAILURE_TEXT="WPSS/WLAN failed. The v1.3 test attempts Wi-Fi recovery; verify whether it succeeded. For a dump: Action, Volume Down, then Volume Up."
         PANIC_TITLE="Reboot log saved"
-        PANIC_TEXT="The previous reboot was related to WPSS/Wi-Fi. For a dump: Action, Volume Down, then Volume Up."
+        PANIC_TEXT="The previous boot log contains WPSS/Wi-Fi errors. For a dump: Action, Volume Down, then Volume Up."
         ;;
 esac
 
@@ -45,8 +45,12 @@ record_boot_status() {
         echo "bootreason=$(getprop ro.boot.bootreason)"
         sha256sum /vendor/lib/modules/qca_cld3_wlan.ko 2>&1
         sha256sum /vendor/lib/modules/5.4-gki/qca_cld3_wlan.ko 2>&1
+        sha256sum /vendor/lib/modules/qca_cld3_qca6750.ko 2>&1
+        echo "loaded_wlan_build_id=$(/system/bin/toybox od -An -tx1 -j16 -N8 /sys/module/wlan/notes/.note.gnu.build-id 2>/dev/null | tr -d '[:space:]')"
+        echo "expected_v13_build_id=e2388611edd9fe47"
         grep '^wlan ' /proc/modules 2>&1
-        grep 'qca_cld3_wlan.ko' /proc/mounts 2>&1
+        grep -E 'qca_cld3_(wlan|qca6750)\.ko' /proc/mounts 2>&1
+        dmesg 2>&1 | grep -a 'WPSS_RESCUE:' | tail -n 30
     } >> "$EVENT_LOG"
 }
 
@@ -60,7 +64,7 @@ save_pstore() {
         if [ ! -f "$DEST" ]; then
             cp -f "$SRC" "$DEST" 2>/dev/null
             chmod 0600 "$DEST" 2>/dev/null
-            if grep -aEq 'WLAN Panic|MHI_DEV_SYS_ERR|Driver reinit failed|consecutive probe failures|QDF BUG in __hdd_soc_probe' "$DEST"; then
+            if grep -aEq 'WLAN Panic|MHI_DEV_SYS_ERR|Driver reinit failed|consecutive probe failures|QDF BUG in __hdd_soc_probe|Subsys notifier chain for wpss|wlan_hdd_pld_shutdown' "$DEST"; then
                 NEW_WLAN_PANIC=1
             fi
         fi
@@ -98,16 +102,7 @@ wait_for_android() {
 publish_logs() {
     wait_for_android
     mkdir -p "$PUBLIC_LOGROOT" 2>/dev/null || return
-    rm -f "$PUBLIC_LOGROOT"/kernel.log* 2>/dev/null
-    rm -f "$PUBLIC_LOGROOT"/events.log* 2>/dev/null
-    rm -f "$PUBLIC_LOGROOT"/console-ramoops-*.txt 2>/dev/null
-    rm -f "$PUBLIC_LOGROOT"/pmsg-ramoops-*.txt 2>/dev/null
-    rm -f "$PUBLIC_LOGROOT"/status_*.txt 2>/dev/null
-    ls -1t "$PUBLIC_LOGROOT"/wlan_dump_*.tar.gz 2>/dev/null |
-    tail -n +2 |
-    while IFS= read -r OLD; do
-        rm -f "$OLD"
-    done
+    # /sdcard/log is shared with manual diagnostics. Do not delete its files.
     chmod 0755 "$PUBLIC_LOGROOT" 2>/dev/null
 }
 
