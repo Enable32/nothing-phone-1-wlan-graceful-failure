@@ -11,21 +11,33 @@ LOCALE="$(getprop persist.sys.locale)"
 case "$LOCALE" in
     ru*|RU*)
         FAILURE_TITLE="Ошибка Wi-Fi"
-        FAILURE_TEXT="WPSS/WLAN дал сбой. Тест v1.3 пытается восстановить Wi-Fi; результат нужно проверить. Для дампа: Action, Громкость -, затем Громкость +."
+        FAILURE_TEXT="WPSS/WLAN дал сбой. Тест драйвера пытается восстановить Wi-Fi; результат нужно проверить. Action: пункт 2 — дамп, пункт 3 — ручное восстановление."
         PANIC_TITLE="Сохранён журнал перезагрузки"
-        PANIC_TEXT="В журнале прошлой загрузки есть ошибки WPSS/Wi-Fi. Для дампа: Action, Громкость -, затем Громкость +."
+        PANIC_TEXT="В журнале прошлой загрузки есть ошибки WPSS/Wi-Fi. Action: пункт 2 — дамп."
         ;;
     *)
         FAILURE_TITLE="Wi-Fi failure"
-        FAILURE_TEXT="WPSS/WLAN failed. The v1.3 test attempts Wi-Fi recovery; verify whether it succeeded. For a dump: Action, Volume Down, then Volume Up."
+        FAILURE_TEXT="WPSS/WLAN failed. The driver test attempts Wi-Fi recovery; verify whether it succeeded. Action: 2 for a dump, 3 for manual recovery."
         PANIC_TITLE="Reboot log saved"
-        PANIC_TEXT="The previous boot log contains WPSS/Wi-Fi errors. For a dump: Action, Volume Down, then Volume Up."
+        PANIC_TEXT="The previous boot log contains WPSS/Wi-Fi errors. Action: choose 2 for a dump."
         ;;
 esac
 
 rm -f "$STATE_FILE"
 mkdir -p "$LOGROOT"
 chmod 0700 "$LOGROOT"
+# A previous boot or killed invocation may leave a lock. Never clear a lock
+# whose recorded process is still alive; do not steal locks during Action.
+RECOVERY_PID=$(cat "$LOGROOT/wifi_recovery.lock/pid" 2>/dev/null)
+case "$RECOVERY_PID" in
+    ''|*[!0-9]*) ;;
+    *)
+        if ! kill -0 "$RECOVERY_PID" 2>/dev/null; then
+            rm -f "$LOGROOT/wifi_recovery.lock/pid"
+            rmdir "$LOGROOT/wifi_recovery.lock" 2>/dev/null
+        fi
+        ;;
+esac
 
 rotate_event_log() {
     SIZE="$(wc -c < "$EVENT_LOG" 2>/dev/null)"

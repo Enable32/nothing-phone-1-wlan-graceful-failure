@@ -287,6 +287,13 @@ set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/post-fs-data.sh" 0 0 0755
 set_perm "$MODPATH/action.sh" 0 0 0755
 set_perm "$MODPATH/boot_patch.sh" 0 0 0755
+set_perm "$MODPATH/wifi_recover.sh" 0 0 0755
+for HELPER in volume_keys.sh volume_filter.sh action_menu.sh wifi_recovery.sh; do
+    set_perm "$MODPATH/lib/$HELPER" 0 0 0644
+done
+for FILTER in fresh_scans.awk; do
+    set_perm "$MODPATH/lib/$FILTER" 0 0 0644
+done
 set_perm "$MODPATH/boot_patch/payload/wpss_related_rescue.sh" 0 0 0750
 set_perm "$MODPATH/boot_patch/payload/wpss_related_rescue.rc" 0 0 0644
 
@@ -304,9 +311,16 @@ say "- Обычная Magisk-подмена слишком поздняя для
     "- A normal Magisk overlay is too late for the early vendor_modprobe"
 say "- Action подготовит тестовый boot с QCA6750 в раннем ramdisk" \
     "- Action will prepare a test boot with QCA6750 in the early ramdisk"
-say "- ZIP сам по себе не исправляет раннюю загрузку; нужен новый тестовый boot" \
-    "- The ZIP alone does not change early boot; a new test boot is required"
+say "- Нужен ранний boot v1.3: уже проверенный образ можно оставить" \
+    "- Early v1.3 boot is required: keep an already verified image"
 say "- Action никогда не прошивает boot-раздел автоматически" \
     "- Action never flashes the boot partition automatically"
 say "- Для отката раннего драйвера восстановите полный backup boot A через OrangeFox" \
     "- Restore the full boot A backup in OrangeFox to roll back the early driver"
+
+say "- Action: Громкость + меняет номер; Громкость - запускает пункт" \
+    "- Action: Volume Up changes the number; Volume Down runs the selection"
+say "- Пункт 3: до трёх ручных попыток Wi-Fi; Громкость - отменяет повторы" \
+    "- Option 3: up to three manual Wi-Fi recovery attempts; Volume Down cancels"
+say "- Для уже проверенного раннего boot v1.3 новый boot не требуется" \
+    "- An already verified early v1.3 boot needs no new boot image"

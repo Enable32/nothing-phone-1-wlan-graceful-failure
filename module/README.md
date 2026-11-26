@@ -1,159 +1,146 @@
-# Nothing Phone (1) WLAN graceful failure v1.3 — TEST
+# Nothing Phone (1) WLAN Graceful Failure v1.4 — TEST
 
-**Только Spacewar 2509261631, ядро 5.4.274-qgki-g4670d6bdb795, слот A.**
-Экспериментальный патч драйвера QCA6750. На телефоне v1.3 пока не проверен.
-Аппаратная причина сбоев MHI/PCIe сохраняется; успешное восстановление и
-отсутствие дальнейших перезагрузок не гарантируются.
+Только Spacewar `2509261631`, ядро `5.4.274-qgki-g4670d6bdb795`.
+v1.4 добавляет меню и ручное восстановление Wi-Fi. Драйвер, его бинарный патч
+и ранние boot-файлы сохранены от v1.3 без изменений.
 
-## Изменения
+## Меню Action
 
-v1.2 оставлял Android в работе, но намеренно возвращал -EIO из reinit.
-В дампах 19–21 октября драйвер оставался `is_driver_recovering 1`, после чего
-включение Wi-Fi завершалось таймаутом. WPSS мог сообщать `FW is ready`,
-но полноценная инициализация драйвера не выполнялась.
+Громкость **+** переключает номер по кругу, громкость **−** выполняет выбранный
+пункт. Меню начинает с пункта 1; без нажатий оно закроется через 120 секунд.
+Отпускания и удержание кнопки не считаются новыми нажатиями.
 
-v1.3 возвращает штатный путь `hdd_wlan_re_init`, запускающий модули и адаптеры.
-Shutdown и reinit отдельно захватывают новую psoc-транзакцию; при занятой
-транзакции обработчик возвращается без ожидания её захвата и без чужого stop.
-Перед инициализацией сохраняется ожидание уже начавшихся операций.
-Каждый обработчик освобождает только свою успешно захваченную транзакцию.
-Поздний callback при уже снятом состоянии recovering пропускается.
+| Номер | Действие |
+| --- | --- |
+| 1 | Время работы телефона |
+| 2 | Один архив диагностики в `/sdcard/log` |
+| 3 | Восстановление Wi-Fi, максимум три попытки |
+| 4 | Полный backup boot A и отдельный TEST boot |
+| 5 | Выход |
 
-При реальной ошибке восстановления сохраняются очистка и код ошибки.
-Убраны только локальные переходы к panic после неудачного восстановления;
-проверки целостности стека, ShadowCallStack и глобальные аварийные таймеры
-не изменяются. При отсутствии адаптера реальный reinit возвращает ошибку
-через существующую очистку вместо продолжения с NULL.
+При потере доступа к кнопкам меню может создать диагностический архив, но
+не запускает восстановление или сборщик boot самостоятельно.
 
-Успешное восстановление снимает recovering штатным кодом. Ошибка не
-маскируется под успех и не исправляется принудительным сбросом флага.
-Дополнительного цикла принудительных перезапусков, rmmod/insmod или
-переключения Android Wi-Fi этот модуль не запускает. Попытка реального
-восстановления выполняется при штатном callback после готовности WPSS.
-Bluetooth-драйверы не меняются.
+## Как работает пункт 3
 
-## Установка и подготовка образа
+1. Проверяется точная сборка, уже загруженный драйвер v1.3 с build ID
+   `e2388611edd9fe47`, WPSS `RELATED`, готовность Android и наличие нужных
+   команд `cmd wifi`. Одновременно допускается один запуск.
+2. Если Android сообщает о подключении и `wlan0` активен, новых перезапусков
+   не будет. Если Wi-Fi выключен, запрашивается его включение.
+3. Сначала выполняется сканирование без перезапуска.
+4. Если результата нет, используется штатный механизм Android
+   `cmd wifi trigger-recovery`, после чего запрашивается новое сканирование.
+5. При появлении свежих сетей либо состояния подключения попытки прекращаются.
+   Включённый переключатель, наличие интерфейса и старый список сетей сами
+   по себе не считаются успехом. Для свежих результатов проверяется возраст
+   записей относительно запроса сканирования, с пределом пять секунд.
 
-1. Установить ZIP через Magisk. До подготовки нового образа не перезагружаться.
-2. В Termux выполнить:
+Ограничение — **три запроса восстановления и 180 секунд общего времени**.
+Отдельный вызов Android ограничен восемью секундами и оставшимся бюджетом
+времени; зависший клиент получает завершающий сигнал. При смене политики WPSS,
+ошибке Binder, неподдерживаемом формате ответа или потере кнопок скрипт
+останавливается и не отправляет следующий запрос восстановления.
+
+Во время выполнения **громкость − отменяет дальнейшие попытки**. Уже принятый
+Android запрос может закончиться после отмены. При зависшей команде реакция
+может занять до её таймаута. Если рядом нет доступных точек, лимит также
+завершит работу; это не доказывает поломку радио.
+
+Wi-Fi и точка доступа временно прерываются. Команды не перезапускают мобильную
+связь, Bluetooth, Android или system_server, не выгружают `.ko` и не меняют
+boot-разделы. Аппаратный сбой всё ещё может вызвать CrashDump: этот скрипт
+не может гарантировать восстановление или удержать аварийно падающее ядро.
+
+## Установка поверх работающей v1.3
+
+Установить ZIP через Magisk. Если ранний boot v1.3 уже проверен и загружен,
+пересобирать или прошивать boot и переустанавливать Magisk не требуется.
+
+Чтобы запустить новое меню сразу, пока файлы модуля ожидают перезагрузки:
 
 ```sh
-su -c 'M=/data/adb/modules_update/wlan_graceful_fail_spacewar; [ -f "$M/boot_patch.sh" ] || M=/data/adb/modules/wlan_graceful_fail_spacewar; sh "$M/boot_patch.sh"'
+su -c 'M=/data/adb/modules_update/wlan_graceful_fail_spacewar; [ -f "$M/action.sh" ] || M=/data/adb/modules/wlan_graceful_fail_spacewar; sh "$M/action.sh"'
 ```
 
-Сборщик сохраняет полный backup текущего `boot_a` и отдельный TEST-образ в
-`/sdcard/Download`, с полной датой и временем в именах. Журнал находится в
-`/sdcard/log/wpss_boot_build_дата_время_PID.txt`.
+При следующей обычной загрузке Magisk активирует установленное обновление.
+Принудительная перезагрузка ради проверки меню не нужна.
 
-Сборщик читает boot-раздел; результат в раздел не записывает. Текущий kernel
-проверяется по SHA-256 и сохраняется. Существующий Magisk ramdisk сохраняется;
-переустановка Magisk не выполняется. Проверка готового образа повторно
-распаковывает его и сравнивает kernel и ramdisk. Это не доказывает загрузку
-образа или исправность Wi-Fi на телефоне.
+Ручной запуск только восстановления из уже активного модуля:
 
-Изменяется ранняя копия драйвера в ramdisk, а не исходный код ядра.
-ZIP без нового boot-образа не заменит уже встроенный ранний драйвер.
-
-## Допустимые входные образы
-
-Размер boot A: 100663296 байт. Kernel внутри backup должен иметь SHA-256:
-
-```text
-2f2656528794dde2cb54f4abb613ebffb59b5528e034863aa4aedd7bef5d0fda
+```sh
+su -c 'sh /data/adb/modules/wlan_graceful_fail_spacewar/wifi_recover.sh'
 ```
 
-Принимаются три ранее проверенных полных boot-хеша:
+## Первая установка и boot
 
-```text
-6285978fe6650510da801b24067bf95ef067c01b6c2c5b5d61b0c7d5425d28c8
-31f4ac5d32fd375f7729be35007ada9825af838de8351563f3e5ec13589de2e4
-2d43dc21a2523e98e6895a3dfed2992af2a3072492d24ad17b5d0646f2be976b
-```
+ZIP сохраняет точные проверки входных драйверов v1.3. Если ранний образ ещё
+не подготовлен, пункт 3 откажется выполнять попытки. Пункт 4 использует
+сборщик v1.3: он создаёт полный датированный backup boot A и отдельный образ
+в `/sdcard/Download`, сохраняет существующий Magisk ramdisk и kernel и ничего
+не прошивает автоматически. Предпочтительна временная проверка `fastboot boot`
+перед постоянной установкой. Понадобится не менее 1 ГиБ свободного места.
 
-Для уже изменённого boot v1.2/v1.3 полный хеш может отличаться. В этом случае
-сборщик требует одновременно точное ядро, Magisk ramdisk и совпадение всех
-трёх ранних файлов (драйвер, SH, RC) с одним известным комплектом v1.2/v1.3.
-При несовпадении сборка останавливается, а проверенный backup остаётся.
-
-## Первая проверка
-
-Предпочтительно временно загрузить TEST-образ с ПК:
-
-```text
-fastboot.exe boot "путь-к-TEST-образу.img"
-```
-
-Установка через OrangeFox в `Boot` слота **A** является записью образа и
-не заменяет временную проверку. Перед ней нужно сохранить доступный полный
-backup. Слот B не используется. Разделы data/vendor/system не прошиваются.
-
-После запуска v1.3 загруженный WLAN build ID должен быть:
-
-```text
-e2388611edd9fe47
-```
-
-Хеш фактически подготовленного QCA6750:
+Ожидаемый QCA6750 SHA-256:
 
 ```text
 291cce1505c234e8425abf3eea385fe077ae8663ba1c1337c414b6d0be6b93e9
 ```
 
-В Action: Громкость + — время работы; Громкость - — дополнительные действия.
-На втором экране: Громкость + — один архив диагностики; Громкость - — backup
-и отдельный TEST boot. Дампы всегда в `/sdcard/log`, старые дампы сохраняются.
+Это обновление интерфейса и userspace-инструментов; новый вариант бинарного
+патча ядра или драйвера в v1.4 не добавлялся.
 
-После сбоя нужно проверить появление `wlan0`, подключение к сети и дамп.
-`FW is ready` и `re-probing driver` отдельно ещё не доказывают восстановление.
+## Логи и откат
 
-## Откат
+Одна попытка ручного восстановления создаёт один текстовый отчёт:
 
-В OrangeFox восстановить сохранённый полный backup в **Boot слота A**,
-затем отключить файловую подмену модуля:
-
-```sh
-touch /data/adb/modules/wlan_graceful_fail_spacewar/disable
+```text
+/sdcard/log/wifi_recovery_ГГГГ-ММ-ДД_ЧЧ-ММ-СС_PID.txt
 ```
 
-Если есть ожидающее обновление, также отключить его:
+В нём есть результаты команд, причина остановки и число запросов. Ограниченная
+копия последнего отчёта включается в общий архив диагностики пункта 2.
+Сети и их адреса остаются в локальном отчёте; публиковать его в репозитории
+вместе с исходниками не нужно.
 
-```sh
-[ ! -d /data/adb/modules_update/wlan_graceful_fail_spacewar ] || touch /data/adb/modules_update/wlan_graceful_fail_spacewar/disable
-```
+Если процесс был аварийно убит, может остаться lock. Скрипт не захватывает
+чужой lock; при обычной загрузке служба удаляет lock уже завершившегося процесса.
 
-Одно отключение модуля не удаляет встроенный ранний драйвер из boot.
+Откат только меню: установить предыдущий ZIP v1.3. Если требуется убрать ранний
+драйвер, восстановить полный сохранённый boot A через OrangeFox и отключить
+модуль. Отключение модуля само по себе не удаляет файлы из ramdisk boot.
 
-## Проверки вне телефона
+## Проверки и источники
 
-Патч проверен на исходном ELF и точной версии v1.2: оба входа дают один
-проверяемый выходной хеш; размер, секции и ABI сохраняются. Проверены записи
-ELF relocation, которые загрузчик применяет после чтения изменённых команд.
+Host-проверки в `tests/test_recovery.py` репозитория выполняют реальный shell
+код с подменой Android/аппаратных операций: переходы меню, очистка обработчика
+кнопок, возраст результатов, остановка после успеха, отмена, лимиты, ошибочный
+драйвер/политика, ошибки Binder с нулевым кодом возврата и параллельный запуск.
+Это не проверка реального восстановления на Nothing Phone (1).
 
-20 сценариев исполняют реальные ARM64-команды внешних обработчиков с
-имитацией внутренних вызовов ядра: обычный успех/ошибка, повторный callback,
-занятая транзакция, отсутствующий контекст, гонка состояния, третий отказ,
-неверная шина и последовательность shutdown/reinit/duplicate/shutdown.
-Они проверяют владение транзакцией, освобождение ресурсов и сохранение ошибки.
-Это не моделирование всего драйвера, оборудования или Android.
+Исторические отчёты v1.3 в `source/` относятся к неизменённому бинарному патчу.
 
-`source/driver_patch.json` и `source/patch_driver.py` воспроизводят бинарный
-патч из точного исходного ELF или v1.2. Полные проприетарные KO в ZIP не входят.
+- [AOSP WifiShellCommand: trigger-recovery](https://android.googlesource.com/platform/packages/modules/Wifi/+/10cc79ed05/service/java/com/android/server/wifi/WifiShellCommand.java)
+- [AOSP ScanResultUtil: возраст результатов](https://android.googlesource.com/platform/packages/modules/Wifi/+/refs/heads/main/framework/java/android/net/wifi/util/ScanResultUtil.java)
 
 ## English
 
-Exact Nothing Phone (1) Spacewar build 2509261631 and kernel
-5.4.274-qgki-g4670d6bdb795 only. **Experimental and not yet device-tested.**
-v1.3 restores the real WLAN reinit body, acquiring a fresh psoc transaction
-instead of resuming a transaction that shutdown already released. A busy or
-late callback does not release another owner's transaction. Normal operation
-draining, real errors, stack checks and global crash controls remain enabled.
-Local recovery-failure panic paths return through cleanup instead.
+v1.4 TEST adds a numbered volume-key Action menu and bounded manual userspace
+Wi-Fi recovery. Volume Up cycles 1–5, Volume Down runs the selection. During
+recovery Volume Down cancels further requests. Options: uptime, one dump,
+Wi-Fi recovery, backup/test boot, exit.
 
-Install the ZIP, run the staged builder command above BEFORE reboot, and keep
-the full backup. The builder produces a separate test boot in Download and
-logs in `/sdcard/log`; it never flashes a block device or reinstalls Magisk.
-The real kernel bytes remain unchanged. Prefer temporary `fastboot boot` for
-the first test. Restore the complete boot A backup AND disable the module to
-roll back. Disabling the module alone does not undo the embedded early driver.
-Hardware MHI/PCIe faults remain; recovery and freedom from reboots cannot be
-guaranteed. Bluetooth drivers and Android's Wi-Fi switch are not modified.
+Recovery requires the exact loaded v1.3 driver and WPSS RELATED. It tries a
+scan first, then at most three Android `cmd wifi trigger-recovery` requests
+within 180 seconds. It stops for fresh scan results or Android-reported
+connection plus an active wlan0; cached results and an enabled switch alone
+are insufficient. Binder failures, unknown responses and lost key input stop
+further requests. Individual client commands have timeouts.
+
+An already accepted Android recovery may finish after cancellation. Hardware
+failure may still cause CrashDump. There is no kernel module unloading, global
+reboot, mobile/Bluetooth reset or boot flashing. The v1.3 driver and early boot
+payload are unchanged. Existing verified v1.3 boot and Magisk need no reflashing
+for this UI update. Logs are written to `/sdcard/log`.
+
+This release has host behavioural tests and still needs device verification.

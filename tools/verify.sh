@@ -2,7 +2,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-ZIP="${1:-$ROOT/dist/Nothing-Phone-1-WLAN-v1.3-RECOVERY-TEST.zip}"
+ZIP="${1:-$ROOT/dist/Nothing-Phone-1-WLAN-v1.4-UI-RECOVERY-TEST.zip}"
 
 for SCRIPT in \
     "$ROOT"/module/customize.sh \
@@ -10,7 +10,9 @@ for SCRIPT in \
     "$ROOT"/module/service.sh \
     "$ROOT"/module/action.sh \
     "$ROOT"/module/boot_patch.sh \
-    "$ROOT"/module/boot_patch/payload/wpss_related_rescue.sh; do
+    "$ROOT"/module/boot_patch/payload/wpss_related_rescue.sh \
+    "$ROOT"/module/wifi_recover.sh \
+    "$ROOT"/module/lib/*.sh; do
     sh -n "$SCRIPT"
 done
 
@@ -38,7 +40,14 @@ for REQUIRED in \
     source/build_driver.py \
     source/test_driver.py \
     source/test_results.json \
-    source/packaging_results.json; do
+    source/packaging_results.json \
+    source/userspace_test_results.json \
+    wifi_recover.sh \
+    lib/action_menu.sh \
+    lib/volume_keys.sh \
+    lib/volume_filter.sh \
+    lib/wifi_recovery.sh \
+    lib/fresh_scans.awk; do
     unzip -Z1 "$ZIP" | grep -Fx "$REQUIRED" >/dev/null
 done
 

@@ -113,6 +113,7 @@ create_dump() {
     cp -f "$LOGROOT"/pmsg-ramoops-*.txt "$DUMP_DIR/module_logs/" 2>/dev/null
     cp -f "$LOGROOT"/events.log* "$DUMP_DIR/module_logs/" 2>/dev/null
     cp -f "$LOGROOT"/kernel.log* "$DUMP_DIR/module_logs/" 2>/dev/null
+    cp -f "$LOGROOT"/wifi_recovery.log "$DUMP_DIR/module_logs/" 2>/dev/null
     cp -f /data/adb/wpss_related_rescue.log "$DUMP_DIR/module_logs/" 2>/dev/null
     cp -f /sys/module/wlan/notes/.note.gnu.build-id \
         "$DUMP_DIR/loaded-wlan-build-id.bin" 2>/dev/null
@@ -160,83 +161,47 @@ create_dump() {
     fi
 }
 
-wait_volume_key() {
-    GETEVENT_BIN="$(command -v getevent 2>/dev/null)"
-    [ -n "$GETEVENT_BIN" ] || return 2
+# All menu operations share one key reader, including cancellation during recovery.
+. "$MODDIR/lib/volume_keys.sh"
+. "$MODDIR/lib/action_menu.sh"
+. "$MODDIR/lib/wifi_recovery.sh"
+trap 'rec_cleanup; keys_stop' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-    FAILURES=0
-    while true; do
-        KEY_EVENT="$("$GETEVENT_BIN" -qlc 1 2>/dev/null)"
-        KEY_RESULT=$?
-        if [ "$KEY_RESULT" != "0" ]; then
-            FAILURES=$((FAILURES + 1))
-            [ "$FAILURES" -ge 3 ] && return 2
-            sleep 1
-            continue
-        fi
-        case "$KEY_EVENT" in
-            *KEY_VOLUMEUP*DOWN*|*"0001 0073 00000001"*) return 0 ;;
-            *KEY_VOLUMEDOWN*DOWN*|*"0001 0072 00000001"*) return 1 ;;
-        esac
-    done
-}
-
-echo
-if [ "$RU" = "1" ]; then
-    echo "Выберите действие физической кнопкой:"
-    echo "  Громкость +  — показать время работы"
-    echo "  Громкость -  — открыть дополнительные действия"
-else
-    echo "Choose an action with a physical key:"
-    echo "  Volume Up    — show uptime"
-    echo "  Volume Down  — more actions"
+if ! keys_start; then
+    if [ "$RU" = 1 ]; then
+        echo "Кнопки недоступны. Создаю только диагностический архив."
+    else
+        echo "Volume keys unavailable. Creating only a diagnostic archive."
+    fi
+    create_dump
+    exit $?
 fi
-echo
 
-wait_volume_key
-FIRST_CHOICE=$?
-case "$FIRST_CHOICE" in
-    0)
-        show_uptime
-        exit $?
+choose_action
+MENU_RESULT=$?
+case "$MENU_RESULT" in
+    0) ;;
+    3)
+        if [ "$RU" = 1 ]; then echo "Время выбора истекло. Действие отменено."
+        else echo "Menu timed out. No action was started."; fi
+        exit 0
         ;;
-    1) ;;
     *)
-        if [ "$RU" = "1" ]; then
-            echo "Не удалось прочитать кнопки громкости. Создаю только безопасный дамп."
-        else
-            echo "Could not read the volume keys. Creating only the safe dump."
-        fi
+        if [ "$RU" = 1 ]; then echo "Ошибка чтения кнопок. Создаю только дамп."
+        else echo "Key input failed. Creating only a dump."; fi
         create_dump
         exit $?
         ;;
 esac
 
-echo
-if [ "$RU" = "1" ]; then
-    echo "Дополнительные действия:"
-    echo "  Громкость +  — создать один архив с диагностикой"
-    echo "  Громкость -  — сделать backup и тестовый boot с ранним QCA6750"
-    echo "Патченая копия НЕ будет прошита автоматически."
-else
-    echo "More actions:"
-    echo "  Volume Up    — create one diagnostic archive"
-    echo "  Volume Down  — back up boot_a and build an early-QCA6750 test boot"
-    echo "The patched copy will NOT be flashed automatically."
-fi
-echo
-
-wait_volume_key
-SECOND_CHOICE=$?
-case "$SECOND_CHOICE" in
-    0) create_dump ;;
-    1) "$MODDIR/boot_patch.sh" ;;
-    *)
-        if [ "$RU" = "1" ]; then
-            echo "Кнопки не прочитаны. Изменение boot отменено; создаю дамп."
-        else
-            echo "Keys could not be read. Boot-image creation was cancelled; creating a dump."
-        fi
-        create_dump
-        ;;
+case "$ACTION_SELECTED" in
+    1) keys_stop; show_uptime ;;
+    2) keys_stop; create_dump ;;
+    3) recover_wifi ;;
+    4) keys_stop; sh "$MODDIR/boot_patch.sh" ;;
+    5) exit 0 ;;
+    *) exit 1 ;;
 esac

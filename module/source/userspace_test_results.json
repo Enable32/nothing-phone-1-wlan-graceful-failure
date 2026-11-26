@@ -1,0 +1,7 @@
+{
+  "version": "1.4 TEST",
+  "date": "2026-11-26",
+  "passed": 18,
+  "source": "tests/test_recovery.py",
+  "scope": "Host behavioural tests of shipped shell and parsers with Android/hardware IO mocked; no device recovery or boot verification. Driver and early boot remain byte-identical to v1.3."
+}
